@@ -13,11 +13,9 @@ from schemas.profiles import ProfileResponseSchema, ProfileRequestSchema
 from database import get_db, UserModel, UserGroupEnum, UserProfileModel
 from security.interfaces import JWTAuthManagerInterface
 from storages import S3StorageInterface
-from validation import validate_image
+
 
 router = APIRouter()
-
-# Write your code here
 
 
 async def check_auth_and_get_user(
@@ -71,21 +69,13 @@ async def create_user_profile(
             "last_name": last_name,
             "gender": gender,
             "date_of_birth": date_of_birth,
-            "info": info}
+            "info": info,
+            "avatar": avatar}
 
     try:
         user_data = ProfileRequestSchema(**data)
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=e.json())
-
-    if avatar:
-        try:
-            validate_image(avatar)
-            avatar.file.seek(0)
-        except (ValueError, HTTPException) as e:
-            if isinstance(e, HTTPException):
-                raise e
-            raise HTTPException(status_code=422, detail=str(e))
 
     try:
         contents = await avatar.read()
