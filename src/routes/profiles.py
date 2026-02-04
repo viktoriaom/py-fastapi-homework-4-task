@@ -77,15 +77,19 @@ async def create_user_profile(
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=e.json())
 
-    try:
-        contents = await avatar.read()
-        extension = avatar.filename.rsplit(".", 1)[-1]
-        avatar_key = f"avatars/{user_id}_avatar.{extension}"
-        await s3_client.upload_file(avatar_key, contents)
-        avatar_url = await s3_client.get_file_url(avatar_key)
+    avatar_key = None
+    avatar_url = None
 
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to upload avatar. Please try again later.")
+    if avatar:
+        try:
+            contents = await avatar.read()
+            extension = avatar.filename.rsplit(".", 1)[-1]
+            avatar_key = f"avatars/{user_id}_avatar.{extension}"
+            await s3_client.upload_file(avatar_key, contents)
+            avatar_url = await s3_client.get_file_url(avatar_key)
+
+        except Exception:
+            raise HTTPException(status_code=500, detail="Failed to upload avatar. Please try again later.")
 
     db_data = await db.execute(
         select(UserModel)
@@ -93,14 +97,21 @@ async def create_user_profile(
         .where(UserModel.id == current_user_id))
     current_user = db_data.scalar_one_or_none()
 
-    if not current_user:
-        raise HTTPException(status_code=401, detail="User not found or not active.")
-    if not current_user.is_active:
+    if not current_user or not current_user.is_active:
         raise HTTPException(status_code=401, detail="User not found or not active.")
 
     if user_id != current_user_id:
         if current_user.group.name != UserGroupEnum.ADMIN:
             raise HTTPException(status_code=403, detail="You don't have permission to edit this profile.")
+
+    db_data = await db.execute(
+        select(UserModel)
+        .options(selectinload(UserModel.group))
+        .where(UserModel.id == user_id))
+    profile_user = db_data.scalar_one_or_none()
+
+    if not profile_user:
+        raise HTTPException(status_code=401, detail="User not found or not active.")
 
     db_data = await db.execute(select(UserProfileModel).where(UserProfileModel.user_id == user_id))
     existing_profile = db_data.scalar_one_or_none()

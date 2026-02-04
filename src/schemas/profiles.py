@@ -17,7 +17,7 @@ class ProfileRequestSchema(BaseModel):
     gender: str = Field(...)
     date_of_birth: date = Field(...)
     info: str = Field(...)
-    avatar: Any = Field(...)
+    avatar: Any
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -47,7 +47,8 @@ class ProfileRequestSchema(BaseModel):
     @field_validator("avatar")
     @classmethod
     def avatar_must_be_valid(cls, value):
-        validate_image(value)
+        if value:
+            validate_image(value)
         return value
 
 
